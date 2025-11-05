@@ -4,9 +4,10 @@ import cors, { CorsOptions } from "cors";
 import { connectDB } from "./config/database";
 import vehicleRoutes from "./routes/vehicleRoutes";
 import brandRoutes from "./routes/brandRoutes";
+import userRoutes from "./routes/userRoutes";
 
 dotenv.config();
-// connectDB();
+connectDB();
 
 const app = express();
 
@@ -27,6 +28,7 @@ app.use(cors(corsOptions));
 
 app.use(express.json());
 
+app.use("/api/user", userRoutes);
 app.use("/api/vehicles", vehicleRoutes);
 app.use("/api/brands", brandRoutes);
 

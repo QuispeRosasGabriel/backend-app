@@ -6,7 +6,7 @@ export const canUserPublish = async (userId: string): Promise<boolean> => {
   try {
     // Obtener el usuario
     const user = await User.findById(userId);
-    if (!user) throw new Error("User not found");
+    if (!user) throw new Error("Usuario no encontrado");
 
     // Verificar si tiene un paquete asignado
     if (!user.packageType) throw new Error("User has no package assigned");
