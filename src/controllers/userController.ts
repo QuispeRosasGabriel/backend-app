@@ -112,14 +112,15 @@ export const getUsers = async (req: Request, res: Response): Promise<any> => {
 // Obtener usuario por ID
 export const getUserById = async (req: Request, res: Response): Promise<any> => {
   try {
-    const { id } = req.params;
+    console.log(req)
+    const { id } = req.query;
 
-    if (!id || id.length !== 24) {
-      return res.status(400).json({ message: "Formato de ID de usuario no válido" });
-    }
-
+     if (!id) {
+       return res.status(400).json({ message: "Formato de ID de usuario no válido" });
+     }
+    console.log(id)
     const user = await User.findById(id);
-
+    console.log(user)
     if (!user) {
       return res.status(404).json({ message: "Usuario no encontrado" });
     }

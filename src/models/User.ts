@@ -1,4 +1,4 @@
-import { Schema, model, Document } from "mongoose";
+import { Schema, model, Document, Types } from "mongoose";
 
 export interface IUser extends Document {
   firstName: string;
@@ -12,8 +12,10 @@ export interface IUser extends Document {
   description?: string;
   isReseller?: boolean;
   packageType?: string;
+  refreshToken?: string;
   createdAt: Date;
   updatedAt: Date;
+  vehicles?: Types.ObjectId[];
 }
 
 const UserSchema = new Schema<IUser>(
@@ -40,6 +42,8 @@ const UserSchema = new Schema<IUser>(
       ],
       required: true
     },
+    refreshToken: { type: String, required: false, default: "" },
+    vehicles: [{ type: Schema.Types.ObjectId, ref: "Vehicle", required: false }],
   },
   { timestamps: true }
 );

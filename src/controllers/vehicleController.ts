@@ -1,11 +1,11 @@
 import { Request, Response } from "express";
 import { Vehicle } from "../models/Vehicle";
 import { canUserPublish } from "../utils";
+import mongoose from "mongoose";
+import { User } from "../models/User";
 
-export const createVehicle = async (
-  req: Request,
-  res: Response
-): Promise<any> => {
+
+export const createVehicle = async (req: Request, res: Response): Promise<any> => {
   try {
     const {
       userId,
@@ -15,48 +15,65 @@ export const createVehicle = async (
       model,
       year,
       type,
+      status,
+      fuelType,
       lastMaintenanceDate,
       nextMaintenanceDate,
       price,
       verified,
       description,
       transmission,
-      status,
     } = req.body;
 
-    // Verificar si el usuario puede publicar más vehículos
-    const canPublish = await canUserPublish(userId);
-    if (!canPublish) {
-      return res
-        .status(403)
-        .json({ message: "You have reached your publication limit." });
+    // Validar que userId sea válido
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: "ID de usuario no válida o faltante" });
     }
+
+    // Validar campos obligatorios (puedes añadir más según tu esquema)
+    if (!brand || !model || !price || !year) {
+      return res.status(400).json({ message: "Faltan campos obligatorios" });
+    }
+
+    /*   // Verificar si el usuario puede publicar más vehículos
+      const canPublish = await canUserPublish(userId);
+      if (!canPublish) {
+        return res
+          .status(403)
+          .json({ message: "You have reached your publication limit." });
+      } */
 
     // Crear el nuevo vehículo
     const vehicle = new Vehicle({
+      seller: userId,
       km,
       color,
       brand,
       model,
+      year,
       type,
+      status,
+      fuelType,
+      transmission,
       price,
       description,
-      verified,
-      year,
-      transmission,
+      verified: verified ?? false, // valor por defecto
       lastMaintenanceDate,
       nextMaintenanceDate,
-      status,
-      seller: userId,
     });
 
     await vehicle.save();
-
+    await User.findByIdAndUpdate(
+      userId,
+      { $push: { vehicles: vehicle._id } },
+      { new: true }
+    );
     return res
       .status(201)
-      .json({ message: "Vehicle published successfully", vehicle });
+      .json({ message: "Vehículo publicado con éxito", vehicle });
   } catch (error) {
-    return res.status(500).json({ message: "Error publishing vehicle", error });
+    console.error("Error al crear el vehículo: ", error);
+    return res.status(500).json({ message: "Error al publicar el vehículo", error });
   }
 };
 

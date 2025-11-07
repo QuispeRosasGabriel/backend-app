@@ -2,6 +2,7 @@ import express from "express";
 import dotenv from "dotenv";
 import cors, { CorsOptions } from "cors";
 import { connectDB } from "./config/database";
+import cookieParser from "cookie-parser";
 import vehicleRoutes from "./routes/vehicleRoutes";
 import brandRoutes from "./routes/brandRoutes";
 import userRoutes from "./routes/userRoutes";
@@ -25,7 +26,7 @@ const corsOptions: CorsOptions = {
 };
 
 app.use(cors(corsOptions));
-
+app.use(cookieParser());
 app.use(express.json());
 
 app.use("/api/user", userRoutes);

@@ -4,60 +4,120 @@ import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer"
 import { User } from "../models/User";
 
-export const loginUser = async (req: Request, res: Response): Promise<any> => {
+export const loginUser = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
+    const user = await User.findOne({ email }).select("_id email firstName password");
 
-    // 1️⃣ Verificar si el usuario existe
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ message: "Usuario no encontrado" });
-    }
+    if (!user) return res.status(404).json({ message: "Usuario no encontrado" });
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ message: "Credenciales no válidas" });
-    }
+    console.log(isMatch)
+    if (!isMatch) return res.status(401).json({ message: "Credenciales inválidas" });
 
-    // 3️⃣ Crear el token JWT
-    const secretKey = process.env.JWT_SECRET || "default_secret_key";
-    const token = jwt.sign(
-      {
-        id: user._id,
-        email: user.email,
-        firstName: user.firstName,
-        isReseller: user.isReseller,
-      },
-      secretKey,
-      { expiresIn: "2h" }
+    // Generar tokens
+    const accessToken = jwt.sign(
+      { id: user._id, email: user.email },
+      process.env.JWT_SECRET!,
+      { expiresIn: "15m" }
     );
 
+    const refreshToken = jwt.sign(
+      { id: user._id },
+      process.env.JWT_REFRESH_SECRET!,
+      { expiresIn: "7d" }
+    );
+
+    // 💾 Guardar refresh token en BD
+    user.refreshToken = refreshToken;
+    await user.save();
+    // Enviar refresh token como cookie segura
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 días
+    });
+
+    // Enviar solo el accessToken al frontend
     res.json({
-      message: "Inicio de sesión exitosa",
-      token,
+      message: "Inicio de sesión exitoso",
+      accessToken,
       user: {
         id: user._id,
         email: user.email,
         firstName: user.firstName,
-        lastName: user.lastName,
       },
     });
+
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Error del servidor" });
   }
 };
 
-export const logoutUser = (req: Request, res: Response): any => {
-  const tokenBlacklist = new Set(); 
-  const token = req.headers.authorization?.split(" ")[1];
-  if (token) {
-    tokenBlacklist.add(token);
-    return res.json({ message: "Sesión cerrada correctamente" });
+export const logoutUser = async (req: Request, res: Response) => {
+  try {
+    const token = req.cookies.refreshToken;
+    if (!token) return res.status(400).json({ message: "No hay token" });
+
+    const user = await User.findOne({ refreshToken: token });
+    if (user) {
+      user.refreshToken = "";
+      await user.save();
+    }
+
+    // Borrar la cookie
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      sameSite: "strict",
+      secure: process.env.NODE_ENV === "production",
+    });
+
+    res.json({ message: "Sesión cerrada correctamente" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Error al cerrar sesión" });
   }
-  res.status(400).json({ message: "Token no proporcionado" });
 };
 
+export const refreshTokenUser = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const refreshToken = req.cookies?.refreshToken || req.body.refreshToken; // puede venir por cookie o body
+
+    if (!refreshToken) {
+      return res.status(401).json({ message: "No se proporcionó refresh token" });
+    }
+
+    const secretKey = process.env.JWT_REFRESH_SECRET || "default_refresh_secret";
+
+    // Validar el refresh token
+    const decoded: any = jwt.verify(refreshToken, secretKey);
+
+    // Buscar usuario en la BD y verificar que el token coincida
+    const user = await User.findById(decoded.id);
+    if (!user || user.refreshToken !== refreshToken) {
+      return res.status(403).json({ message: "Refresh token inválido o no autorizado" });
+    }
+
+    // Generar nuevo access token
+    const accessToken = jwt.sign(
+      {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+      },
+      process.env.JWT_SECRET || "default_secret_key",
+      { expiresIn: "2h" }
+    );
+
+    res.json({ accessToken });
+  } catch (error) {
+    console.error(error);
+    res.status(403).json({ message: "Refresh token inválido o expirado" });
+  }
+};
 
 export const forgotPasswordUser = async (req: Request, res: Response): Promise<any> => {
   try {
@@ -66,7 +126,7 @@ export const forgotPasswordUser = async (req: Request, res: Response): Promise<a
     // 1️⃣ Verificar si el usuario existe
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).json({ message: "Usuario no encontrado" });
+      return res.status(404).json({ message: "Email no encontrado" });
     }
 
     // 2️⃣ Crear token temporal (válido 15 min)

@@ -7,8 +7,9 @@ export interface IVehicle extends Omit<Document, "model"> {
   model: string;
   year: number;
   price: string;
+  type: String
   status: string;
-  type: string;
+  fuelType: String;
   lastMaintenanceDate?: Date;
   nextMaintenanceDate?: Date;
   description?: string;
@@ -28,8 +29,9 @@ const VehicleSchema = new Schema<IVehicle>(
     transmission: { type: String, required: false },
     verified: { type: Boolean, required: false, default: false },
     price: { type: String, required: true },
-    type: { type: String, required: true },
-    status: { type: String, required: true },
+    type: { type: String, enum: ["SUV", "Sedan", "Pickup", "Hatchback", "Coupe", "Van", "Motorcycle", "Convertible"], required: true },
+    status: { type: String, enum: ['Nuevo', 'Seminuevo', 'Usado'], required: true },
+    fuelType: { type: String, enum: ["Gasolina", "Diesel", "Electrico", "Hibrido", "Gas Natural", "GLP"], required: true },
     description: { type: String, required: false },
     year: { type: Number, required: true },
     lastMaintenanceDate: { type: Date },
