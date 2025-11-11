@@ -1,17 +1,22 @@
 import { Schema, model, Document, Types } from "mongoose";
 
+export interface IImage {
+  url: string;
+  isMain: boolean;
+}
 export interface IVehicle extends Omit<Document, "model"> {
-  km: string;
+  km: number;
   color: string;
   brand: string;
   model: string;
   year: number;
-  price: string;
-  type: String
+  price: number;
+  type: string
   status: string;
-  fuelType: String;
+  fuelType: string;
   lastMaintenanceDate?: Date;
   nextMaintenanceDate?: Date;
+  images: IImage[];
   description?: string;
   transmission?: string;
   verified?: boolean;
@@ -20,18 +25,26 @@ export interface IVehicle extends Omit<Document, "model"> {
   updatedAt: Date;
 }
 
+const ImageSchema = new Schema<IImage>(
+  {
+    url: { type: String, required: true },
+    isMain: { type: Boolean, required: true, default: false },
+  }
+);
+
 const VehicleSchema = new Schema<IVehicle>(
   {
-    km: { type: String, required: true },
+    km: { type: Number, required: true },
     color: { type: String, required: true },
     brand: { type: String, required: true },
     model: { type: String, required: true },
-    transmission: { type: String, required: false },
+    transmission: { type: String, enum: ["Automatico", "Manual"], required: false },
     verified: { type: Boolean, required: false, default: false },
-    price: { type: String, required: true },
+    price: { type: Number, required: true },
     type: { type: String, enum: ["SUV", "Sedan", "Pickup", "Hatchback", "Coupe", "Van", "Motorcycle", "Convertible"], required: true },
     status: { type: String, enum: ['Nuevo', 'Seminuevo', 'Usado'], required: true },
     fuelType: { type: String, enum: ["Gasolina", "Diesel", "Electrico", "Hibrido", "Gas Natural", "GLP"], required: true },
+    images: { type: [ImageSchema], required: true, default: [] },
     description: { type: String, required: false },
     year: { type: Number, required: true },
     lastMaintenanceDate: { type: Date },

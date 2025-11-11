@@ -28,8 +28,6 @@ export const loginUser = async (req: Request, res: Response) => {
       { expiresIn: "7d" }
     );
 
-    // 💾 Guardar refresh token en BD
-    user.refreshToken = refreshToken;
     await user.save();
     // Enviar refresh token como cookie segura
     res.cookie("refreshToken", refreshToken, {

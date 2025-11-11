@@ -42,7 +42,7 @@ const UserSchema = new Schema<IUser>(
       ],
       required: true
     },
-    refreshToken: { type: String, required: false, default: "" },
+    refreshToken: { type: String, required: false},
     vehicles: [{ type: Schema.Types.ObjectId, ref: "Vehicle", required: false }],
   },
   { timestamps: true }

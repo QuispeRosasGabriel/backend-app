@@ -21,6 +21,7 @@ export const createVehicle = async (req: Request, res: Response): Promise<any> =
       nextMaintenanceDate,
       price,
       verified,
+      images,
       description,
       transmission,
     } = req.body;
@@ -56,6 +57,7 @@ export const createVehicle = async (req: Request, res: Response): Promise<any> =
       fuelType,
       transmission,
       price,
+      images,
       description,
       verified: verified ?? false, // valor por defecto
       lastMaintenanceDate,
@@ -158,28 +160,172 @@ export const getVehicles = async (
   }
 };
 
-export const getVehicleById = async (
-  req: Request,
-  res: Response
-): Promise<any> => {
+export const getVehicleById = async (req: Request, res: Response): Promise<any> => {
   try {
     const { id } = req.params;
+    console.log("ID recibido:", id);
 
+    // Validar ID
     if (!id || id.length !== 24) {
-      return res.status(400).json({ message: "Invalid vehicle ID format" });
+      return res.status(400).json({ message: "Formato de ID de vehículo inválido" });
     }
 
-    const vehicle = await Vehicle.findById(id).populate(
-      "seller",
-      "name lastName email phone"
-    );
+    // Buscar vehículo
+    const vehicle = await Vehicle.findById(id)
+      .populate("seller", "_id firstName lastName email phone")
 
     if (!vehicle) {
-      return res.status(404).json({ message: "Vehicle not found" });
+      return res.status(404).json({ message: "Vehículo no encontrado" });
     }
 
-    res.status(200).json(vehicle);
+    return res.status(200).json({
+      message: "Vehículo encontrado con éxito",
+      vehicle,
+    });
   } catch (error) {
-    res.status(500).json({ message: "Error retrieving vehicle", error });
+    console.error("Error al obtener vehículo por ID:", error);
+    return res.status(500).json({ message: "Error al recuperar vehículo", error });
+  }
+};
+
+export const getVehiclesByUserId = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { userId } = req.params;
+    if (!userId) {
+      return res.status(400).json({ message: "Se requiere ID de usuario." });
+    }
+
+    // Buscar vehículos asociados al usuario
+    const vehicles = await Vehicle.find({ seller: userId });
+    // Verificar si tiene vehículos
+    if (!vehicles || vehicles.length === 0) {
+      return res.status(404).json({ message: "No se han encontrado vehículos para esta usuario." });
+    }
+
+    // Devolver vehículos
+    return res.status(200).json({
+      message: "Vehículos recuperados con éxito.",
+      total: vehicles.length,
+      vehicles,
+    });
+
+  } catch (error) {
+    console.error("Error al recuperar vehículos por ID de usuario:", error);
+    return res.status(500).json({ message: "Error del servidor " });
+  }
+};
+
+
+export const getFilteredVehicles = async (req: Request, res: Response): Promise<any> => {
+  try {
+    // 📥 Extraer filtros desde query params
+    const {
+      brand,
+      model,
+      year,
+      color,
+      transmission,
+      type,
+      fuelType,
+      status,
+      minPrice,
+      maxPrice,
+      minKm,
+      maxKm,
+      page = 1,
+      pageSize = 25,
+      sortBy = { createdAt: -1 },
+    } = req.query;
+
+    // 🧩 Crear objeto de filtros dinámico
+    const filters: any = {};
+
+    if (brand) filters.brand = { $regex: new RegExp(brand as string, "i") };
+    if (model) filters.model = { $regex: new RegExp(model as string, "i") };
+    if (year) filters.year = Number(year);
+    if (color) filters.color = { $regex: new RegExp(color as string, "i") };
+    if (fuelType) filters.fuelType = { $regex: new RegExp(fuelType as string, "i") };
+    if (transmission) filters.transmission = { $regex: new RegExp(transmission as string, "i") };
+    if (status) filters.status = { $regex: new RegExp(status as string, "i") };
+    if (type) filters.type = type;
+
+    // Filtros numéricos opcionales (rango)
+    if (minPrice || maxPrice)
+      filters.price = {
+        ...(minPrice ? { $gte: Number(minPrice) } : {}),
+        ...(maxPrice ? { $lte: Number(maxPrice) } : {}),
+      };
+
+    if (minKm || maxKm)
+      filters.km = {
+        ...(minKm ? { $gte: Number(minKm) } : {}),
+        ...(maxKm ? { $lte: Number(maxKm) } : {}),
+      };
+
+    // 🔢 Paginación
+    const currentPage = Number(page);
+    const limit = Number(pageSize);
+    const skip = (currentPage - 1) * limit;
+
+    let sortOption: any = { createdAt: -1 }; // por defecto: Avisos recientes
+
+    switch (sortBy) {
+      case "price_asc":
+        sortOption = { price: 1 };
+        break;
+      case "price_desc":
+        sortOption = { price: -1 };
+        break;
+      case "year_desc":
+        sortOption = { year: -1 };
+        break;
+      case "km_asc":
+        sortOption = { km: 1 };
+        break;
+      case "relevance":
+        sortOption = { verified: -1, createdAt: -1 }; // relevancia = verificados primero
+        break;
+      default:
+        sortOption = { createdAt: -1 }; // Avisos recientes
+        break;
+    }
+
+    // 📦 Obtener datos
+    const [vehicles, totalCount] = await Promise.all([
+      Vehicle.find(filters)
+        .populate("seller", "firstName lastName email phone")
+        .skip(skip)
+        .limit(limit)
+        .sort(sortOption)
+        .lean(),
+      Vehicle.countDocuments(filters),
+    ]);
+
+    // 🔍 Dejar solo la imagen principal dentro del arreglo `images`
+    const vehiclesWithFilteredImages = vehicles.map((v) => {
+      const mainImage = v.images?.find((img: any) => img.isMain);
+      return {
+        ...v,
+        images: mainImage ? [mainImage] : [],
+      };
+    });
+
+    res.status(200).json({
+      message: "Vehículos obtenidos correctamente",
+      filtersUsed: { ...filters, sortOption },
+      pagination: {
+        page: currentPage,
+        pageSize: limit,
+        totalPages: Math.ceil(totalCount / limit),
+        totalCount,
+      },
+      vehicles: vehiclesWithFilteredImages,
+    });
+  } catch (error) {
+    console.error("Error al obtener vehículos filtrados:", error);
+    res.status(500).json({
+      message: "Error al obtener vehículos",
+      error,
+    });
   }
 };
