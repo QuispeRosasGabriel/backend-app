@@ -191,34 +191,102 @@ export const getVehicleById = async (req: Request, res: Response): Promise<any> 
 export const getVehiclesByUserId = async (req: Request, res: Response): Promise<any> => {
   try {
     const { userId } = req.params;
+    const {
+      status,
+      search = "",
+      page = 1,
+      pageSize = 25,
+      sortBy = 'recent'
+    } = req.query;
+
     if (!userId) {
       return res.status(400).json({ message: "Se requiere ID de usuario." });
     }
 
-    // Buscar vehículos asociados al usuario
-    const vehicles = await Vehicle.find({ seller: userId });
-    // Verificar si tiene vehículos
-    if (!vehicles || vehicles.length === 0) {
-      return res.status(404).json({ message: "No se han encontrado vehículos para esta usuario." });
+    // Filtros dinámicos
+    const filters: any = { seller: userId };
+    if (status) filters.status = { $regex: new RegExp(status as string, "i") };
+    if (search) {
+      const searchRegex = new RegExp(search as string, "i");
+      filters.$or = [{ brand: searchRegex }, { model: searchRegex }];
     }
 
+    // Paginación
+    const currentPage = Number(page);
+    const limit = Number(pageSize);
+    const skip = (currentPage - 1) * limit;
+
+    // Ordenamiento (sort)
+    let sortOption: any = { createdAt: -1, _id: 1 }; // <- estable por defecto
+
+    switch (sortBy) {
+      case "relevance":
+        sortOption = { verified: -1, createdAt: -1, _id: 1 };
+        break;
+      case "price_desc":
+        sortOption = { price: -1, _id: 1 };
+        break;
+      case "price_asc":
+        sortOption = { price: 1, _id: 1 };
+        break;
+      case "year_desc":
+        sortOption = { year: -1, _id: 1 };
+        break;
+      case "km_asc":
+        sortOption = { km: 1, _id: 1 };
+        break;
+      default:
+        sortOption = { createdAt: -1, _id: 1 }; // <- Avisos más recientes
+    }
+
+    // Obtener vehículos filtrados y paginados
+    const [vehicles, totalCount] = await Promise.all([
+      Vehicle.find(filters)
+        .populate("seller", "firstName lastName email phone")
+        .skip(skip)
+        .limit(limit)
+        .sort(sortOption)
+        .lean(),
+      Vehicle.countDocuments(filters),
+    ]);
+
+    // Verificar resultados
+    if (!vehicles || vehicles.length === 0) {
+      return res.status(404).json({ message: "No se encontraron vehículos." });
+    }
+
+    // Dejar solo la imagen principal dentro del arreglo `images`
+    const vehiclesWithFilteredImages = vehicles.map((v) => {
+      const mainImage = v.images?.find((img: any) => img.isMain);
+      return {
+        ...v,
+        images: mainImage ? [mainImage] : [],
+      };
+    });
+
     // Devolver vehículos
-    return res.status(200).json({
+    res.status(200).json({
       message: "Vehículos recuperados con éxito.",
-      total: vehicles.length,
-      vehicles,
+      filtersUsed: { ...filters, sortOption },
+      pagination: {
+        page: currentPage,
+        pageSize: limit,
+        totalPages: Math.ceil(totalCount / limit),
+        totalCount,
+      },
+      vehicles: vehiclesWithFilteredImages,
     });
 
   } catch (error) {
     console.error("Error al recuperar vehículos por ID de usuario:", error);
-    return res.status(500).json({ message: "Error del servidor " });
+    res.status(500).json({ message: "Error del servidor ", error, });
   }
 };
 
 
 export const getFilteredVehicles = async (req: Request, res: Response): Promise<any> => {
   try {
-    // 📥 Extraer filtros desde query params
+    // Extraer filtros desde query params
     const {
       brand,
       model,
@@ -234,10 +302,10 @@ export const getFilteredVehicles = async (req: Request, res: Response): Promise<
       maxKm,
       page = 1,
       pageSize = 25,
-      sortBy = { createdAt: -1 },
+      sortBy = "recent",
     } = req.query;
 
-    // 🧩 Crear objeto de filtros dinámico
+    // Crear objeto de filtros dinámico
     const filters: any = {};
 
     if (brand) filters.brand = { $regex: new RegExp(brand as string, "i") };
@@ -262,7 +330,7 @@ export const getFilteredVehicles = async (req: Request, res: Response): Promise<
         ...(maxKm ? { $lte: Number(maxKm) } : {}),
       };
 
-    // 🔢 Paginación
+    // Paginación
     const currentPage = Number(page);
     const limit = Number(pageSize);
     const skip = (currentPage - 1) * limit;
@@ -290,7 +358,7 @@ export const getFilteredVehicles = async (req: Request, res: Response): Promise<
         break;
     }
 
-    // 📦 Obtener datos
+    // Obtener datos
     const [vehicles, totalCount] = await Promise.all([
       Vehicle.find(filters)
         .populate("seller", "firstName lastName email phone")
@@ -301,7 +369,7 @@ export const getFilteredVehicles = async (req: Request, res: Response): Promise<
       Vehicle.countDocuments(filters),
     ]);
 
-    // 🔍 Dejar solo la imagen principal dentro del arreglo `images`
+    // Dejar solo la imagen principal dentro del arreglo `images`
     const vehiclesWithFilteredImages = vehicles.map((v) => {
       const mainImage = v.images?.find((img: any) => img.isMain);
       return {
@@ -310,6 +378,7 @@ export const getFilteredVehicles = async (req: Request, res: Response): Promise<
       };
     });
 
+    // Devolver vehículos
     res.status(200).json({
       message: "Vehículos obtenidos correctamente",
       filtersUsed: { ...filters, sortOption },
@@ -321,6 +390,7 @@ export const getFilteredVehicles = async (req: Request, res: Response): Promise<
       },
       vehicles: vehiclesWithFilteredImages,
     });
+
   } catch (error) {
     console.error("Error al obtener vehículos filtrados:", error);
     res.status(500).json({
