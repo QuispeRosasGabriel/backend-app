@@ -79,6 +79,50 @@ export const createVehicle = async (req: Request, res: Response): Promise<any> =
   }
 };
 
+export const updateVehicle = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+
+    if (!id || id.length !== 24) {
+      return res.status(400).json({ message: "Formato de ID de vehículo inválido" });
+    }
+
+    // Validar que el ID sea correcto
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "ID de vehículo inválido." });
+    }
+
+    // Validar que haya campos para actualizar
+    if (!updates || Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: "No se han enviado datos para actualizar." });
+    }
+
+    // Asegurar que no se cambie el seller directamente por seguridad
+    if (updates.seller) delete updates.seller;
+
+    // Actualizar el vehículo
+    const updatedVehicle = await Vehicle.findByIdAndUpdate(
+      id,
+      { $set: updates },
+      { new: true } // devuelve el documento actualizado
+    ).populate("seller", "_id firstName lastName email phone");
+
+    if (!updatedVehicle) {
+      return res.status(404).json({ message: "Vehículo no encontrado." });
+    }
+
+    return res.status(200).json({
+      message: "Vehículo actualizado con éxito.",
+      vehicle: updatedVehicle,
+    });
+  } catch (error) {
+    console.error("Error al actualizar vehículo:", error);
+    return res.status(500).json({ message: "Error del servidor al actualizar vehículo", error });
+  }
+};
+
+
 export const getVehicles = async (
   req: Request,
   res: Response
