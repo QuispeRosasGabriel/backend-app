@@ -12,7 +12,6 @@ export const loginUser = async (req: Request, res: Response) => {
     if (!user) return res.status(404).json({ message: "Usuario no encontrado" });
 
     const isMatch = await bcrypt.compare(password, user.password);
-    console.log(isMatch)
     if (!isMatch) return res.status(401).json({ message: "Credenciales inválidas" });
 
     // Generar tokens
@@ -182,7 +181,6 @@ export const resetPasswordUser = async (req: Request, res: Response): Promise<an
 
     const secretKey = process.env.JWT_SECRET || "default_secret_key";
     const decoded: any = jwt.verify(token, secretKey);
-    console.log(decoded, "hola")
 
     const user = await User.findById(decoded.id);
     if (!user) {

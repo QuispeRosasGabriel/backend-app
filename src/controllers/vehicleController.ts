@@ -128,7 +128,6 @@ export const getVehicles = async (
   res: Response
 ): Promise<any> => {
   try {
-    console.log("Fetching vehicles...");
 
     // Pagination
     const page = parseInt(req.query.page as string) || 1;
@@ -207,7 +206,6 @@ export const getVehicles = async (
 export const getVehicleById = async (req: Request, res: Response): Promise<any> => {
   try {
     const { id } = req.params;
-    console.log("ID recibido:", id);
 
     // Validar ID
     if (!id || id.length !== 24) {
