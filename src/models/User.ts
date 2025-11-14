@@ -16,6 +16,7 @@ export interface IUser extends Document {
   createdAt: Date;
   updatedAt: Date;
   vehicles?: Types.ObjectId[];
+  recentVehicles?: Types.ObjectId[];
 }
 
 const UserSchema = new Schema<IUser>(
@@ -42,8 +43,9 @@ const UserSchema = new Schema<IUser>(
       ],
       required: true
     },
-    refreshToken: { type: String, required: false},
+    refreshToken: { type: String, required: false },
     vehicles: [{ type: Schema.Types.ObjectId, ref: "Vehicle", required: false }],
+    recentVehicles: [{ type: Schema.Types.ObjectId, ref: "Vehicle" }],
   },
   { timestamps: true }
 );

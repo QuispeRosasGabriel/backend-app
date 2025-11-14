@@ -114,9 +114,9 @@ export const getUserById = async (req: Request, res: Response): Promise<any> => 
   try {
     const { id } = req.query;
 
-     if (!id) {
-       return res.status(400).json({ message: "Formato de ID de usuario no válido" });
-     }
+    if (!id) {
+      return res.status(400).json({ message: "Formato de ID de usuario no válido" });
+    }
     const user = await User.findById(id);
     if (!user) {
       return res.status(404).json({ message: "Usuario no encontrado" });
@@ -130,3 +130,89 @@ export const getUserById = async (req: Request, res: Response): Promise<any> => 
     });
   }
 };
+
+// Agregar un vehículo al historial de vistos recientemente
+export const addRecentVehicle = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { userId, vehicleId } = req.body;
+
+    if (!userId || !vehicleId) {
+      return res.status(400).json({ message: "userId y vehicleId son obligatorios." });
+    }
+
+    // Buscar al usuario
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "Usuario no encontrado." });
+    }
+
+    // Si ya existe el vehículo en la lista, lo eliminamos para moverlo al frente (orden reciente)
+    user.recentVehicles = (user.recentVehicles ?? []).filter(
+      (v) => v.toString() !== vehicleId
+    );
+
+    // Insertar el nuevo vehículo al inicio
+    user.recentVehicles.unshift(vehicleId);
+
+    // Mantener máximo 3 vehículos
+    if (user.recentVehicles.length > 3) {
+      user.recentVehicles = user.recentVehicles.slice(0, 3);
+    }
+
+    await user.save();
+
+    return res.status(200).json({
+      message: "Vehículo agregado a recientes exitosamente.",
+      recentVehicles: user.recentVehicles,
+    });
+  } catch (error) {
+    console.error("Error al agregar vehículo a recientes:", error);
+    return res.status(500).json({
+      message: "Error al agregar vehículo a recientes.",
+      error,
+    });
+  }
+};
+
+
+export const getRecentVehicles = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({ message: "userId es obligatorio." });
+    }
+
+    const user = await User.findById(userId)
+      .populate({
+        path: "recentVehicles",
+        select: "brand model price year images",
+        options: { lean: true },
+      })
+      .lean();
+
+    if (!user) {
+      return res.status(404).json({ message: "Usuario no encontrado." });
+    }
+
+    const vehiclesWithFilteredImages = (user.recentVehicles ?? []).map((v: any) => {
+      const mainImage = v.images?.find((img: any) => img.isMain);
+      return {
+        ...v,
+        images: mainImage ? [mainImage] : [],
+      };
+    });
+
+    return res.status(200).json({
+      message: "Vehículos recientes obtenidos correctamente.",
+      recentVehicles: vehiclesWithFilteredImages,
+    });
+  } catch (error) {
+    console.error("Error al obtener vehículos recientes:", error);
+    res.status(500).json({
+      message: "Error al obtener vehículos recientes.",
+      error,
+    });
+  }
+};
+

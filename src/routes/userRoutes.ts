@@ -1,5 +1,5 @@
 import express from "express";
-import { createUser, getUsers, getUserById } from "../controllers";
+import { createUser, getUsers, getUserById, addRecentVehicle, getRecentVehicles } from "../controllers";
 import { forgotPasswordUser, loginUser, logoutUser, refreshTokenUser, resetPasswordUser } from "../controllers/authController";
 import { verifyToken } from "../middleware/authMiddleware";
 
@@ -9,6 +9,10 @@ router.post("/forgot-password", forgotPasswordUser);
 router.post("/reset-password/:token", resetPasswordUser);
 router.post("/create-user", createUser);
 router.post("/refresh-token", refreshTokenUser);
+
+router.post("/add-recent-vehicle", addRecentVehicle);
+router.get("/recent-vehicles/:userId", getRecentVehicles);
+
 
 router.use(verifyToken as any);
 /* router.get("/profile", (req, res) => {
