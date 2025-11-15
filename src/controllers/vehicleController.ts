@@ -122,6 +122,87 @@ export const updateVehicle = async (req: Request, res: Response): Promise<any> =
   }
 };
 
+export const softDeleteVehicle = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { id } = req.params;
+
+    const vehicle = await Vehicle.findByIdAndUpdate(
+      id,
+      { state: "Eliminado", deletedAt: new Date() },
+      { new: true }
+    );
+
+    if (!vehicle) {
+      return res.status(404).json({ message: "Vehículo no encontrado" });
+    }
+
+    return res.status(200).json({
+      message: "Vehículo eliminado correctamente (soft delete)",
+      vehicle,
+    });
+  } catch (error) {
+    console.error("Error al realizar soft delete:", error);
+    return res.status(500).json({ message: "Error del servidor", error });
+  }
+};
+
+export const markVehicleAsSold = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { id } = req.params;
+
+    const vehicle = await Vehicle.findByIdAndUpdate(
+      id,
+      { state: "Vendido", deletedAt: null },
+      { new: true }
+    );
+
+    if (!vehicle) {
+      return res.status(404).json({ message: "Vehículo no encontrado" });
+    }
+
+    return res.status(200).json({
+      message: "Vehículo marcado como vendido",
+      vehicle,
+    });
+  } catch (error) {
+    console.error("Error marcando como vendido:", error);
+    return res.status(500).json({ message: "Error del servidor", error });
+  }
+};
+
+export const restoreVehicle = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { id } = req.params;
+
+    const vehicle = await Vehicle.findById(id);
+
+    if (!vehicle) {
+      return res.status(404).json({ message: "Vehículo no encontrado" });
+    }
+
+    // Solo restaurar si NO está ya Publicado
+    if (vehicle.state === "Publicado") {
+      return res.status(400).json({
+        message: "El vehículo ya está Publicado.",
+      });
+    }
+
+    // Restaurar
+    vehicle.state = "Publicado";
+    vehicle.deletedAt = null;
+
+    await vehicle.save();
+
+    return res.status(200).json({
+      message: "Vehículo restaurado correctamente.",
+      vehicle,
+    });
+
+  } catch (error) {
+    console.error("Error restaurando vehículo:", error);
+    return res.status(500).json({ message: "Error del servidor", error });
+  }
+};
 
 export const getVehicles = async (
   req: Request,

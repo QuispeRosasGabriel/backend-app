@@ -21,8 +21,10 @@ export interface IVehicle extends Omit<Document, "model"> {
   transmission?: string;
   verified?: boolean;
   seller: Types.ObjectId;
+  state: string;
   createdAt: Date;
   updatedAt: Date;
+  deletedAt: Date | null;
 }
 
 const ImageSchema = new Schema<IImage>(
@@ -50,6 +52,12 @@ const VehicleSchema = new Schema<IVehicle>(
     lastMaintenanceDate: { type: Date },
     nextMaintenanceDate: { type: Date },
     seller: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    state: {
+      type: String,
+      enum: ["Publicado", "Vendido", "Eliminado"],
+      default: "Publicado",
+    },
+    deletedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
